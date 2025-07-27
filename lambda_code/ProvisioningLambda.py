@@ -2,11 +2,15 @@ import json
 import boto3
 import os
 from datetime import datetime, timedelta
+os.environ['AWS_DEFAULT_REGION'] = 'us-east-1'
 
 dynamodb = boto3.resource('dynamodb')
 iam = boto3.client('iam')
+os.environ['ACCESS_REQUEST_TABLE'] = 'access-request-table'
 
 ACCESS_REQUEST_TABLE = os.environ['ACCESS_REQUEST_TABLE']
+os.environ['IAM_USERS_TABLE'] = 'iam-users-table'
+
 IAM_USERS_TABLE = os.environ['IAM_USERS_TABLE']
 
 def handler(event, context):

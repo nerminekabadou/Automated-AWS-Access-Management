@@ -3,7 +3,7 @@ import boto3
 import os
 from datetime import datetime
 import uuid
-os.environ['AWS_DEFAULT_REGION'] = 'us-east-1'  # Ou une autre région comme eu-west-1
+os.environ['AWS_DEFAULT_REGION'] = 'us-east-1'
 
 dynamodb = boto3.resource('dynamodb')
 stepfunctions = boto3.client('stepfunctions')
