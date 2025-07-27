@@ -3,11 +3,15 @@ import boto3
 import os
 from datetime import datetime
 import uuid
+os.environ['AWS_DEFAULT_REGION'] = 'us-east-1'  # Ou une autre région comme eu-west-1
 
 dynamodb = boto3.resource('dynamodb')
 stepfunctions = boto3.client('stepfunctions')
+os.environ['ACCESS_REQUEST_TABLE'] = 'access-request-table'
 
 ACCESS_REQUEST_TABLE = os.environ['ACCESS_REQUEST_TABLE']
+os.environ['STATE_MACHINE_ARN'] = 'arn:aws:states:us-east-1:123456789012:stateMachine:MyStateMachine'
+
 STATE_MACHINE_ARN = os.environ['STATE_MACHINE_ARN']
 
 def handler(event, context):
