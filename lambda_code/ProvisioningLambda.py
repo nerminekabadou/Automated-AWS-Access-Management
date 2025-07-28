@@ -42,7 +42,7 @@ def handler(event, context):
         iam.attach_user_policy(UserName=username, PolicyArn=policy)
 
     keys = iam.create_access_key(UserName=username)['AccessKey']
-
+    
     expiration = (datetime.utcnow() + timedelta(days=int(duration))).isoformat()
     user_table.put_item(Item={
         "user_id": str(uuid.uuid4()),

@@ -3,16 +3,16 @@ import boto3
 import os
 from datetime import datetime
 import uuid
+
+# Configuration AWS pour LocalStack
 os.environ['AWS_DEFAULT_REGION'] = 'us-east-1'
 
-dynamodb = boto3.resource('dynamodb')
-stepfunctions = boto3.client('stepfunctions')
-os.environ['ACCESS_REQUEST_TABLE'] = 'access-request-table'
+# Connexion à LocalStack
+dynamodb = boto3.resource('dynamodb', endpoint_url='http://localhost:4566')
+stepfunctions = boto3.client('stepfunctions', endpoint_url='http://localhost:4566')
 
-ACCESS_REQUEST_TABLE = os.environ['ACCESS_REQUEST_TABLE']
-os.environ['STATE_MACHINE_ARN'] = 'arn:aws:states:us-east-1:123456789012:stateMachine:MyStateMachine'
-
-STATE_MACHINE_ARN = os.environ['STATE_MACHINE_ARN']
+ACCESS_REQUEST_TABLE = 'access-request-table'
+STATE_MACHINE_ARN = 'arn:aws:states:us-east-1:000000000000:stateMachine:MyStateMachine'
 
 def handler(event, context):
     body = json.loads(event.get("body", "{}"))
@@ -22,7 +22,10 @@ def handler(event, context):
     duration = body.get("duration_days")
 
     if not username or not email or not policies:
-        return {"statusCode": 400, "body": json.dumps({"message": "Missing fields"})}
+        return {
+            "statusCode": 400,
+            "body": json.dumps({"message": "Missing fields"})
+        }
 
     request_id = str(uuid.uuid4())
     created_at = datetime.utcnow().isoformat()
