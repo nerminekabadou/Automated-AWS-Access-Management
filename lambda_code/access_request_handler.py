@@ -1,81 +1,119 @@
+import datetime
 import json
 import uuid
-from datetime import datetime
+import boto3
+from botocore.exceptions import ClientError
+
+dynamodb = boto3.resource('dynamodb')
+
+access_requests_table = dynamodb.Table(os.environ.get("ACCESS_REQUESTS_TABLE", "AccessRequestsTable"))
+policy_templates_table = dynamodb.Table(os.environ.get("POLICY_TEMPLATES_TABLE", "PolicyTemplatesTable"))
+
+ses = boto3.client('ses')
+
+def error_response(status_code, message):
+    return {
+        'statusCode': status_code,
+        'body': json.dumps({'error': message})
+    }
+
+def success_response(response_data):
+    return {
+        'statusCode': 200,
+        'headers': {
+            'Content-Type': 'application/json'
+        },
+        'body': json.dumps(response_data)
+    }
 
 def access_request_handler(event, context):
     try:
-        # Parse the request body
         body = json.loads(event.get('body', '{}'))
-        
-        # Extract required fields (don't require request_id as we'll generate it)
         user_id = body.get('user_id')
         resource = body.get('resource')
         justification = body.get('justification', '')
         duration_hours = body.get('duration_hours', 1)
         
-        # Validate required fields
         if not user_id or not resource:
-            return {
-                'statusCode': 400,
-                'headers': {
-                    'Content-Type': 'application/json'
-                },
-                'body': json.dumps({
-                    'error': 'Missing required fields: user_id and resource are required'
-                })
-            }
+            return error_response(400, 'Missing required fields: user_id and resource are required')
         
-        # Generate a unique request ID
         request_id = str(uuid.uuid4())
-        
-        # Create timestamp
         timestamp = datetime.utcnow().isoformat()
         
-        print(f"Creating access request - User: {user_id}, Resource: {resource}, Request ID: {request_id}")
+        # Check if policy template exists
+        try:
+            response = policy_templates_table.get_item(Key={'resource': resource})
+            if 'Item' in response:
+                status = 'PENDING_APPROVAL'
+            else:
+                status = 'PENDING_MANUAL_REVIEW'
+        except ClientError as e:
+            print(f"DynamoDB error: {e}")
+            status = 'PENDING_MANUAL_REVIEW'
         
-        # Here you would typically:
-        # 1. Save the request to DynamoDB with status PENDING_MANUAL_REVIEW
-        # 2. Send notification to manager
-        # 3. Check if policy template exists (as shown in your diagram)
+        # Save to DynamoDB
+        try:
+            access_requests_table.put_item(
+                Item={
+                    'request_id': request_id,
+                    'user_id': user_id,
+                    'resource': resource,
+                    'justification': justification,
+                    'duration_hours': duration_hours,
+                    'status': status,
+                    'created_at': timestamp,
+                    'updated_at': timestamp
+                }
+            )
+        except ClientError as e:
+            print(f"DynamoDB error: {e}")
+            return error_response(500, 'Failed to save access request')
         
-        # For now, we'll just return success with the generated request_id
+        # Send notification
+        if status == 'PENDING_APPROVAL':
+            send_approval_notification(request_id, user_id, resource)
+        
         response_data = {
             'message': 'Access request submitted successfully',
             'request_id': request_id,
-            'user_id': user_id,
-            'resource': resource,
-            'justification': justification,
-            'duration_hours': duration_hours,
-            'status': 'PENDING_MANUAL_REVIEW',
-            'created_at': timestamp
+            'status': status,
+            # ... other fields
         }
         
-        return {
-            'statusCode': 200,
-            'headers': {
-                'Content-Type': 'application/json'
-            },
-            'body': json.dumps(response_data)
-        }
+        return success_response(response_data)
         
-    except json.JSONDecodeError:
-        return {
-            'statusCode': 400,
-            'headers': {
-                'Content-Type': 'application/json'
-            },
-            'body': json.dumps({
-                'error': 'Invalid JSON in request body'
-            })
-        }
     except Exception as e:
-        print(f"Error processing access request: {str(e)}")
-        return {
-            'statusCode': 500,
-            'headers': {
-                'Content-Type': 'application/json'
-            },
-            'body': json.dumps({
-                'error': 'Internal server error'
-            })
-        }
+        print(f"Error: {str(e)}")
+        return error_response(500, 'Internal server error')
+
+import os
+
+def send_approval_notification(request_id, user_id, resource):
+    try:
+        # Replace with actual manager email
+        manager_email = "kabadounermine@gmail.com"
+        
+        api_gateway_url = os.environ.get('API_GATEWAY_URL', 'api.example.com')
+        approval_url = f"https://{api_gateway_url}/approve/{request_id}"
+        
+        ses.send_email(
+            Source='noreply@yourdomain.com',
+            Destination={'ToAddresses': [manager_email]},
+            Message={
+                'Subject': {'Data': f'Access Request Approval Needed for {resource}'},
+                'Body': {
+                    'Text': {
+                        'Data': f"""Hello Manager,
+                        
+A new access request requires your approval:
+- User: {user_id}
+- Resource: {resource}
+                        
+Please review and approve: {approval_url}
+"""
+                    }
+                }
+            }
+        )
+    except ClientError as e:
+        print(f"SES error: {e}")

@@ -1,76 +1,49 @@
 import json
+import boto3
+import os
+
+# Initialiser le client DynamoDB
+dynamodb = boto3.resource('dynamodb')
+
+access_requests_table = dynamodb.Table(os.environ.get("ACCESS_REQUESTS_TABLE", "AccessRequestsTable"))
+policy_templates_table = dynamodb.Table(os.environ.get("POLICY_TEMPLATES_TABLE", "PolicyTemplatesTable"))
 
 def approval_handler(event, context):
     try:
-        # Extract request_id from path parameters
-        path_parameters = event.get('pathParameters', {})
-        request_id = path_parameters.get('request_id') if path_parameters else None
-        
-        # Extract decision from request body
+        # Corps du message (JSON)
         body = json.loads(event.get('body', '{}'))
-        decision = body.get('decision')
-        
-        if not request_id:
+
+        request_id = body.get('request_id')
+        approval = body.get('approval')  # true or false
+
+        if not request_id or approval is None:
             return {
                 'statusCode': 400,
-                'headers': {
-                    'Content-Type': 'application/json'
-                },
-                'body': json.dumps({'error': 'Missing request_id in path'})
+                'body': json.dumps({'message': 'request_id and approval are required'})
             }
-            
-        if not decision:
-            return {
-                'statusCode': 400,
-                'headers': {
-                    'Content-Type': 'application/json'
-                },
-                'body': json.dumps({'error': 'Missing decision in request body'})
-            }
-        
-        # Validate decision value
-        if decision not in ['approved', 'rejected']:
-            return {
-                'statusCode': 400,
-                'headers': {
-                    'Content-Type': 'application/json'
-                },
-                'body': json.dumps({'error': 'Decision must be either "approved" or "rejected"'})
-            }
-        
-        print(f"Request ID: {request_id}, Decision: {decision}")
-        
-        # Here you would typically:
-        # 1. Update the request status in DynamoDB
-        # 2. Send notifications if needed
-        # 3. Perform any other business logic
-        
+
+        # Déterminer le nouveau statut
+        new_status = "approved" if approval else "rejected"
+
+        # Mettre à jour l'entrée dans DynamoDB
+        response = table.update_item(
+            Key={'request_id': request_id},
+            UpdateExpression="SET #s = :val",
+            ExpressionAttributeNames={"#s": "status"},
+            ExpressionAttributeValues={":val": new_status},
+            ReturnValues="UPDATED_NEW"
+        )
+
         return {
             'statusCode': 200,
-            'headers': {
-                'Content-Type': 'application/json'
-            },
             'body': json.dumps({
-                'message': f"Request {request_id} has been {decision}.",
-                'request_id': request_id,
-                'decision': decision
+                'message': f'Request {request_id} has been {new_status}.',
+                'updatedAttributes': response.get('Attributes')
             })
         }
-        
-    except json.JSONDecodeError:
-        return {
-            'statusCode': 400,
-            'headers': {
-                'Content-Type': 'application/json'
-            },
-            'body': json.dumps({'error': 'Invalid JSON in request body'})
-        }
+
     except Exception as e:
-        print(f"Error processing approval: {str(e)}")
         return {
             'statusCode': 500,
-            'headers': {
-                'Content-Type': 'application/json'
-            },
-            'body': json.dumps({'error': 'Internal server error'})
+            'body': json.dumps({'error': str(e)})
         }
