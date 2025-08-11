@@ -26,7 +26,7 @@ def approval_handler(event, context):
         new_status = "approved" if approval else "rejected"
 
         # Mettre à jour l'entrée dans DynamoDB
-        response = table.update_item(
+        response = access_requests_table.update_item(
             Key={'request_id': request_id},
             UpdateExpression="SET #s = :val",
             ExpressionAttributeNames={"#s": "status"},

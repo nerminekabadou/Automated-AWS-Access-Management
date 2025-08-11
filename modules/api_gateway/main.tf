@@ -25,7 +25,7 @@ resource "aws_api_gateway_integration" "request_access_integration" {
   http_method             = aws_api_gateway_method.request_access_post.http_method
   integration_http_method = "POST"  # Required by Lambda integration
   type                    = "AWS_PROXY"  # Proxy integration (passes request directly to Lambda)
-  uri                     = "arn:aws:apigateway:us-east-1:lambda:path/2015-03-31/functions/${var.access_request_lambda_arn}/invocations"  # Lambda ARN to invoke
+  uri                     = "arn:aws:apigateway:eu-west-2:lambda:path/2015-03-31/functions/${var.access_request_lambda_arn}/invocations"  # Lambda ARN to invoke
 }
 
 # Create the /approve resource under the root path
@@ -60,7 +60,7 @@ resource "aws_api_gateway_integration" "approve_integration" {
   http_method             = aws_api_gateway_method.approve_post.http_method  # Updated reference
   integration_http_method = "POST"
   type                    = "AWS_PROXY"
-  uri                     = "arn:aws:apigateway:us-east-1:lambda:path/2015-03-31/functions/${var.approval_lambda_arn}/invocations"  # Lambda ARN to invoke
+  uri                     = "arn:aws:apigateway:eu-west-2:lambda:path/2015-03-31/functions/${var.approval_lambda_arn}/invocations"  # Lambda ARN to invoke
 }
 
 # Deploy the API (must be done to make it available on the internet)
