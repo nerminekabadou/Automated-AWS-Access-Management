@@ -17,6 +17,7 @@ module "dynamodb" {
   source = "./modules/dynamodb"
 }
 
+#Backend config implementation to track state of the infrastructure deployed on the AWS account
 terraform {
   backend "s3" {
     bucket         = "our-terraform-state-bucket"
