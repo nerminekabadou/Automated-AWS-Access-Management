@@ -1,8 +1,9 @@
-import datetime
+from datetime import datetime, timezone
 import json
 import uuid
 import boto3
 from botocore.exceptions import ClientError
+import os
 
 dynamodb = boto3.resource('dynamodb')
 
@@ -10,6 +11,10 @@ access_requests_table = dynamodb.Table(os.environ.get("ACCESS_REQUESTS_TABLE", "
 policy_templates_table = dynamodb.Table(os.environ.get("POLICY_TEMPLATES_TABLE", "PolicyTemplatesTable"))
 
 ses = boto3.client('ses')
+
+api_id = os.environ['API_GATEWAY_ID']
+region = os.environ['REGION']
+stage = os.environ.get('STAGE', 'prod')
 
 def error_response(status_code, message):
     return {
@@ -38,7 +43,7 @@ def access_request_handler(event, context):
             return error_response(400, 'Missing required fields: user_id and resource are required')
         
         request_id = str(uuid.uuid4())
-        timestamp = datetime.utcnow().isoformat()
+        timestamp = datetime.now(timezone.utc).isoformat()
         
         # Check if policy template exists
         try:
@@ -69,9 +74,11 @@ def access_request_handler(event, context):
             print(f"DynamoDB error: {e}")
             return error_response(500, 'Failed to save access request')
         
-        # Send notification
+        # Send notification based on status
         if status == 'PENDING_APPROVAL':
             send_approval_notification(request_id, user_id, resource)
+        elif status == 'PENDING_MANUAL_REVIEW':
+            send_manual_review_notification(request_id, user_id, resource)
         
         response_data = {
             'message': 'Access request submitted successfully',
@@ -86,18 +93,15 @@ def access_request_handler(event, context):
         print(f"Error: {str(e)}")
         return error_response(500, 'Internal server error')
 
-import os
-
 def send_approval_notification(request_id, user_id, resource):
     try:
         # Replace with actual manager email
         manager_email = "kabadounermine@gmail.com"
         
-        api_gateway_url = os.environ.get('API_GATEWAY_URL', 'api.example.com')
-        approval_url = f"https://{api_gateway_url}/approve/{request_id}"
-        
+        approval_url = f"https://{api_id}.execute-api.{region}.amazonaws.com/{stage}/approve/{request_id}"
+
         ses.send_email(
-            Source='noreply@yourdomain.com',
+            Source='testtalan2025@gmail.com',
             Destination={'ToAddresses': [manager_email]},
             Message={
                 'Subject': {'Data': f'Access Request Approval Needed for {resource}'},
@@ -117,3 +121,33 @@ Please review and approve: {approval_url}
         )
     except ClientError as e:
         print(f"SES error: {e}")
+
+def send_manual_review_notification(request_id, user_id, resource):
+    try:
+        # Remplace par l'email de l'admin
+        admin_email = "kabadounermine@gmail.com"
+        
+        api_gateway_url = os.environ.get('API_GATEWAY_URL', 'api.example.com')
+        review_url = f"https://{api_gateway_url}/manual-review/{request_id}"
+        
+        ses.send_email(
+            Source='testtalan2025@gmail.com',
+            Destination={'ToAddresses': [admin_email]},
+            Message={
+                'Subject': {'Data': f'Access Request Requires Manual Review: {resource}'},
+                'Body': {
+                    'Text': {
+                        'Data': f"""Hello Admin,
+
+A new access request requires manual review:
+- User: {user_id}
+- Resource: {resource}
+
+Please review and take action: {review_url}
+"""
+                    }
+                }
+            }
+        )
+    except ClientError as e:
+        print(f"SES error (manual review): {e}")

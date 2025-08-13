@@ -14,3 +14,9 @@ variable "account_id" {
   description = "The AWS account ID"
   type        = string
 }
+
+variable "profile" {
+  description = "AWS CLI profile to use"
+  type        = string
+  default     = "default"
+}

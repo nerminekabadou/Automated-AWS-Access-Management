@@ -18,6 +18,9 @@ resource "aws_lambda_function" "access_request" {
     variables = {
       POLICY_TEMPLATES_TABLE = "PolicyTemplatesTable"
       ACCESS_REQUESTS_TABLE  = "AccessRequestsTable"
+      API_GATEWAY_ID = var.api_gateway_id
+      REGION = var.region
+      STAGE = "prod"
     }
   }
 }

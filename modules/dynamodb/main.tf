@@ -28,10 +28,10 @@ resource "aws_dynamodb_table" "access_requests" {
 resource "aws_dynamodb_table" "policy_templates" {
   name         = "PolicyTemplatesTable"
   billing_mode = "PAY_PER_REQUEST"
-  hash_key     = "template_id"
+  hash_key     = "resource"
 
   attribute {
-    name = "template_id"
+    name = "resource"
     type = "S"
   }
 }
