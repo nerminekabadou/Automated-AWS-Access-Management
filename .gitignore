@@ -1,6 +1,23 @@
+# Terraform directories and files
 .terraform/
 *.tfstate
 *.tfstate.*
-terraform.tfvars
+*.tfvars
+*.tfvars.json
 *.backup
 crash.log
+override.tf
+override.tf.json
+*_override.tf
+*_override.tf.json
+.terraform.lock.hcl
+
+# OS-generated files
+.DS_Store
+Thumbs.db
+
+# IDE/project-specific files
+*.iml
+.idea/
+.vscode/
+*.swp
