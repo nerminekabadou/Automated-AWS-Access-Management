@@ -127,8 +127,8 @@ def send_manual_review_notification(request_id, user_id, resource):
         # Remplace par l'email de l'admin
         admin_email = "kabadounermine@gmail.com"
         
-        api_gateway_url = os.environ.get('API_GATEWAY_URL', 'api.example.com')
-        review_url = f"https://{api_gateway_url}/manual-review/{request_id}"
+        # URL for manual review
+        review_url = f"https://console.aws.amazon.com/iam/home#/users/{user_id}"
         
         ses.send_email(
             Source='testtalan2025@gmail.com',
