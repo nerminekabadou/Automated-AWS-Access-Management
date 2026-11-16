@@ -20,3 +20,18 @@ variable "profile" {
   type        = string
   default     = "default"
 }
+
+variable "lambda_exec_role_arn" {
+  description = "ARN of the existing IAM role the Lambda functions run with"
+  type        = string
+}
+
+variable "admin_email" {
+  description = "Email address that receives access approval and review requests"
+  type        = string
+}
+
+variable "sender_email" {
+  description = "SES-verified email address used as the sender"
+  type        = string
+}

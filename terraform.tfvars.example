@@ -1,0 +1,8 @@
+# Copy to terraform.tfvars and fill in your values (terraform.tfvars is git-ignored).
+region               = "eu-west-2"
+profile              = "default"
+account_id           = "123456789012"
+api_name             = "access-management-api"
+lambda_exec_role_arn = "arn:aws:iam::123456789012:role/lambda-access-management"
+admin_email          = "admin@example.com"
+sender_email         = "no-reply@example.com"

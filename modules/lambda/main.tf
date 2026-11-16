@@ -1,8 +1,15 @@
-#Used directly the Role provided by the supervisor
-variable "lambda_exec_role_arn" {
-  type        = string
-  description = "ARN of the existing Lambda execution role"
-  default     = "arn:aws:iam::802617578034:role/role-for-interns"
+# Lambda deployment packages are built from the handlers at plan time,
+# so the deployed code always matches lambda_code/*.py.
+data "archive_file" "access_request" {
+  type        = "zip"
+  source_file = "${path.root}/lambda_code/access_request_handler.py"
+  output_path = "${path.root}/build/access_request.zip"
+}
+
+data "archive_file" "approval" {
+  type        = "zip"
+  source_file = "${path.root}/lambda_code/approval_handler.py"
+  output_path = "${path.root}/build/approval.zip"
 }
 
 resource "aws_lambda_function" "access_request" {
@@ -11,16 +18,18 @@ resource "aws_lambda_function" "access_request" {
   handler       = "access_request_handler.access_request_handler"
   runtime       = "python3.11"
 
-  filename         = "${path.root}/lambda_code/access_request.zip"
-  source_code_hash = filebase64sha256("${path.root}/lambda_code/access_request.zip")
+  filename         = data.archive_file.access_request.output_path
+  source_code_hash = data.archive_file.access_request.output_base64sha256
 
   environment {
     variables = {
       POLICY_TEMPLATES_TABLE = "PolicyTemplatesTable"
       ACCESS_REQUESTS_TABLE  = "AccessRequestsTable"
-      API_GATEWAY_ID = var.api_gateway_id
-      REGION = var.region
-      STAGE = "prod"
+      API_GATEWAY_ID         = var.api_gateway_id
+      REGION                 = var.region
+      STAGE                  = "prod"
+      ADMIN_EMAIL            = var.admin_email
+      SENDER_EMAIL           = var.sender_email
     }
   }
 }
@@ -31,8 +40,8 @@ resource "aws_lambda_function" "approval" {
   handler       = "approval_handler.approval_handler"
   runtime       = "python3.11"
 
-  filename         = "${path.root}/lambda_code/approval.zip"
-  source_code_hash = filebase64sha256("${path.root}/lambda_code/approval.zip")
+  filename         = data.archive_file.approval.output_path
+  source_code_hash = data.archive_file.approval.output_base64sha256
 
   environment {
     variables = {

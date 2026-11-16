@@ -10,22 +10,18 @@ policy_templates_table = dynamodb.Table(os.environ.get("POLICY_TEMPLATES_TABLE",
 
 def approval_handler(event, context):
     try:
-        # Corps du message (JSON)
-        body = json.loads(event.get('body', '{}'))
-
-        request_id = body.get('request_id')
-        approval = body.get('approval')  # true or false
-
-        if not request_id or approval is None:
+        # Get request_id from path parameter
+        request_id = event.get('pathParameters', {}).get('request_id')
+        if not request_id:
             return {
                 'statusCode': 400,
-                'body': json.dumps({'message': 'request_id and approval are required'})
+                'body': json.dumps({'message': 'request_id is required'})
             }
 
-        # Déterminer le nouveau statut
-        new_status = "approved" if approval else "rejected"
+        # Always approve (GET link = approve)
+        new_status = "APPROVED"
 
-        # Mettre à jour l'entrée dans DynamoDB
+        # Update DynamoDB
         response = access_requests_table.update_item(
             Key={'request_id': request_id},
             UpdateExpression="SET #s = :val",

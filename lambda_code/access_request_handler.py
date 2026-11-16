@@ -15,6 +15,8 @@ ses = boto3.client('ses')
 api_id = os.environ['API_GATEWAY_ID']
 region = os.environ['REGION']
 stage = os.environ.get('STAGE', 'prod')
+admin_email = os.environ['ADMIN_EMAIL']      # receives approval / review requests
+sender_email = os.environ['SENDER_EMAIL']    # SES-verified sender
 
 def error_response(status_code, message):
     return {
@@ -95,14 +97,11 @@ def access_request_handler(event, context):
 
 def send_approval_notification(request_id, user_id, resource):
     try:
-        # Replace with actual manager email
-        manager_email = "kabadounermine@gmail.com"
-        
         approval_url = f"https://{api_id}.execute-api.{region}.amazonaws.com/{stage}/approve/{request_id}"
 
         ses.send_email(
-            Source='testtalan2025@gmail.com',
-            Destination={'ToAddresses': [manager_email]},
+            Source=sender_email,
+            Destination={'ToAddresses': [admin_email]},
             Message={
                 'Subject': {'Data': f'Access Request Approval Needed for {resource}'},
                 'Body': {
@@ -124,14 +123,11 @@ Please review and approve: {approval_url}
 
 def send_manual_review_notification(request_id, user_id, resource):
     try:
-        # Remplace par l'email de l'admin
-        admin_email = "kabadounermine@gmail.com"
-        
-        api_gateway_url = os.environ.get('API_GATEWAY_URL', 'api.example.com')
-        review_url = f"https://{api_gateway_url}/manual-review/{request_id}"
+        # URL for manual review
+        review_url = f"https://console.aws.amazon.com/iam/home#/users/{user_id}"
         
         ses.send_email(
-            Source='testtalan2025@gmail.com',
+            Source=sender_email,
             Destination={'ToAddresses': [admin_email]},
             Message={
                 'Subject': {'Data': f'Access Request Requires Manual Review: {resource}'},

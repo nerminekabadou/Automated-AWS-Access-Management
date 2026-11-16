@@ -1,8 +1,12 @@
 module "lambda" {
-  source          = "./modules/lambda"
-  region          = var.region
-  account_id      = var.account_id
-  api_gateway_url = module.api_gateway.api_url
+  source               = "./modules/lambda"
+  region               = var.region
+  account_id           = var.account_id
+  api_gateway_url      = module.api_gateway.api_url
+  api_gateway_id       = module.api_gateway.api_id
+  lambda_exec_role_arn = var.lambda_exec_role_arn
+  admin_email          = var.admin_email
+  sender_email         = var.sender_email
 }
 
 module "api_gateway" {
