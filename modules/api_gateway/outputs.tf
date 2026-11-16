@@ -1,4 +1,4 @@
 output "invoke_url" {
-  description = "Full invoke URL for the decision endpoint"
-  value       = "${aws_apigatewayv2_api.admin_api.api_endpoint}/${aws_apigatewayv2_stage.default.name}/decision"
+  description = "Full URL of the decision endpoint (the $default stage has no path prefix)"
+  value       = "${aws_apigatewayv2_stage.default.invoke_url}decision"
 }

@@ -19,7 +19,7 @@ resource "aws_ses_template" "admin_notification" {
 </html>
 EOF
 
-  text    = <<EOF
+  text = <<EOF
 Action Required: IAM User Cleanup for {{username}}
 
 The IAM user {{username}} has expired.
@@ -30,8 +30,4 @@ Choose an action:
 
 This link expires in 24 hours.
 EOF
-
-  tags = {
-    internship = "true"
-  }
 }

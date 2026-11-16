@@ -1,0 +1,4 @@
+# Copy to terraform.tfvars and fill in your values (terraform.tfvars is git-ignored).
+region      = "us-east-2"
+admin_email = "admin@example.com"
+from_email  = "no-reply@example.com"

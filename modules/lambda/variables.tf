@@ -1,60 +1,52 @@
 variable "region" {
-  description = "AWS Region"
+  description = "AWS region"
   type        = string
-  default     = "us-east-2"
 }
 
 variable "iam_users_table" {
-  description = "DynamoDB table name for IAM users"
+  description = "DynamoDB table tracking IAM users"
   type        = string
-  default     = "IAMUsersTable"
-}
-
-variable "access_requests_table" {
-  description = "DynamoDB table name for access requests"
-  type        = string
-  default     = "AccessRequestsTable"
 }
 
 variable "cleanup_lambda_name" {
-  description = "Name for the cleanup Lambda function"
-  type        = string
-  default     = "iam-cleanup-lambda"
+  type = string
 }
 
 variable "cleanup_schedule_lambda_name" {
-  description = "Name for the scheduler Lambda function"
-  type        = string
-  default     = "iam-cleanup-scheduler"
+  type = string
 }
 
 variable "admin_action_lambda_name" {
-  description = "Name for the admin action Lambda function"
-  type        = string
-  default     = "iam-admin-action"
+  type = string
 }
 
 variable "admin_email" {
-  description = "Admin email for notifications"
+  description = "Admin address that receives the cleanup emails"
   type        = string
 }
 
 variable "from_email" {
-  description = "Verified SES email address"
+  description = "SES-verified sender address"
   type        = string
 }
 
 variable "admin_decision_url" {
-  description = "API Gateway endpoint for admin decisions"
+  description = "URL of the decision endpoint used in the email links"
   type        = string
 }
 
-variable "eventbridge_rule_arn" {
-  description = "ARN of the EventBridge rule that triggers the scheduler"
+variable "ses_template_name" {
+  description = "SES template used for the admin email"
   type        = string
 }
 
-variable "api_gateway_execution_arn" {
-  description = "API Gateway execution ARN for permissions"
+variable "decision_secret" {
+  description = "Secret used to sign decision links"
   type        = string
+  sensitive   = true
+}
+
+variable "link_ttl_hours" {
+  description = "Validity of the decision links, in hours"
+  type        = number
 }

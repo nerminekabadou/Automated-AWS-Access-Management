@@ -1,29 +1,29 @@
+# All three functions are packaged from lambda_code/ so they can share
+# decision_token.py. The zip is rebuilt whenever the code changes.
+data "archive_file" "lambda_code" {
+  type        = "zip"
+  source_dir  = "${path.root}/lambda_code"
+  output_path = "${path.root}/build/lambda_code.zip"
+  excludes    = ["__pycache__", "tests"]
+}
+
+data "aws_caller_identity" "current" {}
+
+locals {
+  account_id = data.aws_caller_identity.current.account_id
+}
+
 resource "aws_iam_role" "lambda_execution_role" {
   name = "iam_cleanup_lambda_role"
 
   assume_role_policy = jsonencode({
     Version = "2012-10-17",
-    Statement = [
-      {
-        Action = "sts:AssumeRole",
-        Effect = "Allow",
-        Principal = {
-          Service = "lambda.amazonaws.com"
-        }
-      },
-      {
-        Action = "sts:AssumeRole",
-        Effect = "Allow",
-        Principal = {
-          AWS = "arn:aws:iam::802617578034:root"
-        }
-      }
-    ]
+    Statement = [{
+      Action    = "sts:AssumeRole",
+      Effect    = "Allow",
+      Principal = { Service = "lambda.amazonaws.com" }
+    }]
   })
-
-  tags = {
-    internship = "true"
-  }
 }
 
 resource "aws_iam_role_policy" "lambda_policy" {
@@ -34,66 +34,50 @@ resource "aws_iam_role_policy" "lambda_policy" {
     Version = "2012-10-17",
     Statement = [
       {
-        Sid    = "DynamoDBAccess",
-        Action = [
-          "dynamodb:GetItem",
-          "dynamodb:Scan",
-          "dynamodb:Query",
-          "dynamodb:UpdateItem"
-        ],
+        Sid      = "DynamoDBAccess",
         Effect   = "Allow",
-        Resource = [
-          "arn:aws:dynamodb:${var.region}:*:table/${var.iam_users_table}",
-          "arn:aws:dynamodb:${var.region}:*:table/${var.access_requests_table}"
-        ]
+        Action   = ["dynamodb:Scan", "dynamodb:UpdateItem"],
+        Resource = "arn:aws:dynamodb:${var.region}:${local.account_id}:table/${var.iam_users_table}"
       },
       {
-        Sid    = "LambdaInvoke",
-        Action = ["lambda:InvokeFunction"],
-        Effect = "Allow",
-        Resource = [
-          "arn:aws:lambda:${var.region}:*:function/${var.cleanup_lambda_name}",
-          "arn:aws:lambda:${var.region}:*:function/${var.cleanup_schedule_lambda_name}",
-          "arn:aws:lambda:${var.region}:*:function/${var.admin_action_lambda_name}"
-        ]
+        Sid      = "InvokeCleanup",
+        Effect   = "Allow",
+        Action   = ["lambda:InvokeFunction"],
+        Resource = "arn:aws:lambda:${var.region}:${local.account_id}:function:${var.cleanup_lambda_name}"
       },
       {
-        Sid    = "SESAccess",
-        Action = [
-          "ses:SendEmail",
-          "ses:SendRawEmail"
-        ],
+        Sid      = "SESAccess",
         Effect   = "Allow",
+        Action   = ["ses:SendEmail", "ses:SendTemplatedEmail"],
         Resource = "*",
         Condition = {
-          StringEquals = {
-            "ses:FromAddress" = var.from_email
-          }
+          StringEquals = { "ses:FromAddress" = var.from_email }
         }
       },
       {
         Sid    = "IAMCleanupActions",
+        Effect = "Allow",
         Action = [
-          "iam:ListUsers",
-          "iam:GetUser",
-          "iam:UpdateUser",
-          "iam:DeleteUser",
           "iam:ListAccessKeys",
+          "iam:UpdateAccessKey",
           "iam:DeleteAccessKey",
+          "iam:DeleteLoginProfile",
+          "iam:ListMFADevices",
           "iam:DeactivateMFADevice",
-          "iam:DeleteLoginProfile"
+          "iam:ListAttachedUserPolicies",
+          "iam:DetachUserPolicy",
+          "iam:ListUserPolicies",
+          "iam:DeleteUserPolicy",
+          "iam:ListGroupsForUser",
+          "iam:RemoveUserFromGroup",
+          "iam:DeleteUser"
         ],
-        Effect   = "Allow",
-        Resource = "*"
+        Resource = "arn:aws:iam::${local.account_id}:user/*"
       },
       {
-        Sid    = "BasicLambdaLogging",
-        Action = [
-          "logs:CreateLogGroup",
-          "logs:CreateLogStream",
-          "logs:PutLogEvents"
-        ],
+        Sid      = "BasicLambdaLogging",
         Effect   = "Allow",
+        Action   = ["logs:CreateLogGroup", "logs:CreateLogStream", "logs:PutLogEvents"],
         Resource = "*"
       }
     ]
@@ -101,89 +85,56 @@ resource "aws_iam_role_policy" "lambda_policy" {
 }
 
 resource "aws_lambda_function" "cleanup_lambda" {
-  filename         = "${path.module}/../../lambda_code/cleanup.zip"
   function_name    = var.cleanup_lambda_name
   role             = aws_iam_role.lambda_execution_role.arn
   handler          = "cleanup.lambda_handler"
   runtime          = "python3.12"
   timeout          = 300
-  memory_size      = 512
-  source_code_hash = filebase64sha256("${path.module}/../../lambda_code/cleanup.zip")
+  filename         = data.archive_file.lambda_code.output_path
+  source_code_hash = data.archive_file.lambda_code.output_base64sha256
 
   environment {
-  variables = {
-    USERS_TABLE        = var.iam_users_table
-    ADMIN_EMAIL        = var.admin_email
-    ADMIN_DECISION_URL = module.api_gateway.invoke_url  # Use the new output
-    FROM_EMAIL         = var.from_email
-    REGION             = var.region
-    SES_TEMPLATE_NAME  = module.ses.template_name  # Add this line
-  }
-}
-  tags = {
-    internship = "true"
+    variables = {
+      USERS_TABLE = var.iam_users_table
+    }
   }
 }
 
 resource "aws_lambda_function" "cleanup_scheduler_lambda" {
-  filename         = "${path.module}/../../lambda_code/cleanup_schedule.zip"
   function_name    = var.cleanup_schedule_lambda_name
   role             = aws_iam_role.lambda_execution_role.arn
   handler          = "cleanup_schedule.lambda_handler"
   runtime          = "python3.12"
   timeout          = 300
-  memory_size      = 512
-  source_code_hash = filebase64sha256("${path.module}/../../lambda_code/cleanup_schedule.zip")
+  filename         = data.archive_file.lambda_code.output_path
+  source_code_hash = data.archive_file.lambda_code.output_base64sha256
 
   environment {
     variables = {
       USERS_TABLE        = var.iam_users_table
       ADMIN_EMAIL        = var.admin_email
-      ADMIN_DECISION_URL = var.admin_decision_url
       FROM_EMAIL         = var.from_email
-      REGION             = var.region
+      ADMIN_DECISION_URL = var.admin_decision_url
+      SES_TEMPLATE_NAME  = var.ses_template_name
+      DECISION_SECRET    = var.decision_secret
+      LINK_TTL_HOURS     = tostring(var.link_ttl_hours)
     }
-  }
-
-  tags = {
-    internship = "true"
   }
 }
 
 resource "aws_lambda_function" "admin_action_lambda" {
-  filename         = "${path.module}/../../lambda_code/admin_action.zip"
   function_name    = var.admin_action_lambda_name
   role             = aws_iam_role.lambda_execution_role.arn
   handler          = "admin_action.lambda_handler"
   runtime          = "python3.12"
-  timeout          = 300
-  memory_size      = 512
-  source_code_hash = filebase64sha256("${path.module}/../../lambda_code/admin_action.zip")
+  timeout          = 30
+  filename         = data.archive_file.lambda_code.output_path
+  source_code_hash = data.archive_file.lambda_code.output_base64sha256
 
   environment {
     variables = {
       CLEANUP_FUNCTION_NAME = aws_lambda_function.cleanup_lambda.arn
-      REGION                = var.region
+      DECISION_SECRET       = var.decision_secret
     }
   }
-
-  tags = {
-    internship = "true"
-  }
-}
-
-resource "aws_lambda_permission" "allow_eventbridge" {
-  statement_id  = "AllowExecutionFromEventBridge"
-  action        = "lambda:InvokeFunction"
-  function_name = aws_lambda_function.cleanup_scheduler_lambda.function_name
-  principal     = "events.amazonaws.com"
-  source_arn    = var.eventbridge_rule_arn
-}
-
-resource "aws_lambda_permission" "allow_apigateway" {
-  statement_id  = "AllowExecutionFromAPIGateway"
-  action        = "lambda:InvokeFunction"
-  function_name = aws_lambda_function.admin_action_lambda.function_name
-  principal     = "apigateway.amazonaws.com"
-  source_arn    = "${var.api_gateway_execution_arn}/*/*"
 }

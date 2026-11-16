@@ -1,3 +1,13 @@
 .terraform/
 *.tfstate
 *.tfstate.backup
+# Terraform
+*.tfvars
+!terraform.tfvars.example
+.terraform.lock.hcl
+
+# build output
+build/
+*.zip
+__pycache__/
+.pytest_cache/
