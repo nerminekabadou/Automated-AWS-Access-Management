@@ -1,0 +1,58 @@
+name: merge approval
+
+# When Claude's review of a claude/* pull request finishes, wait for the other
+# checks. If everything passed, the "merge" job waits for my approval
+# (environment "merge-approval": GitHub Mobile notification). Approve = merge.
+on:
+  workflow_run:
+    workflows: ["Claude review"]
+    types: [completed]
+
+jobs:
+  prepare:
+    if: >-
+      github.event.workflow_run.conclusion == 'success' &&
+      startsWith(github.event.workflow_run.head_branch, 'claude/')
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    permissions:
+      pull-requests: read
+      checks: read
+      actions: read
+    outputs:
+      pr: ${{ steps.pr.outputs.pr }}
+    steps:
+      - id: pr
+        env:
+          GH_TOKEN: ${{ github.token }}
+          BRANCH: ${{ github.event.workflow_run.head_branch }}
+        run: |
+          pr=$(gh pr list -R "$GITHUB_REPOSITORY" --head "$BRANCH" --state open --json number --jq '.[0].number // empty')
+          if [ -z "$pr" ]; then echo "No open pull request for $BRANCH."; exit 0; fi
+          sleep 30  # let the other checks register
+          if ! gh pr checks "$pr" -R "$GITHUB_REPOSITORY" --watch --interval 30 > checks.txt; then
+            { echo "## PR #$pr: checks failed, not asking for approval"; echo '```'; cat checks.txt; echo '```'; } >> "$GITHUB_STEP_SUMMARY"
+            exit 0
+          fi
+          echo "pr=$pr" >> "$GITHUB_OUTPUT"
+          {
+            echo "## Ready to merge: $(gh pr view "$pr" -R "$GITHUB_REPOSITORY" --json title,url --jq '"[\(.title)](\(.url))"')"
+            echo; echo '```'; cat checks.txt; echo '```'
+            echo "### Claude's review"
+            gh pr view "$pr" -R "$GITHUB_REPOSITORY" --json comments \
+              --jq '[.comments[] | select(.author.login == "claude")] | last | .body // "No review comment."'
+          } >> "$GITHUB_STEP_SUMMARY"
+
+  merge:
+    needs: prepare
+    if: needs.prepare.outputs.pr != ''
+    runs-on: ubuntu-latest
+    environment: merge-approval
+    steps:
+      - name: Merge
+        env:
+          GH_TOKEN: ${{ secrets.AUTOMATION_TOKEN }}
+          PR: ${{ needs.prepare.outputs.pr }}
+        run: |
+          gh pr merge "$PR" -R "$GITHUB_REPOSITORY" --merge --delete-branch
+          echo "Merged #$PR" >> "$GITHUB_STEP_SUMMARY"
