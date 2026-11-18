@@ -54,5 +54,8 @@ jobs:
           GH_TOKEN: ${{ secrets.AUTOMATION_TOKEN }}
           PR: ${{ needs.prepare.outputs.pr }}
         run: |
-          gh pr merge "$PR" -R "$GITHUB_REPOSITORY" --merge --delete-branch
-          echo "Merged #$PR" >> "$GITHUB_STEP_SUMMARY"
+          branch=$(gh pr view "$PR" -R "$GITHUB_REPOSITORY" --json headRefName --jq .headRefName)
+          gh pr merge "$PR" -R "$GITHUB_REPOSITORY" --merge
+          # --delete-branch needs a local checkout, so delete the branch through the API.
+          gh api -X DELETE "repos/$GITHUB_REPOSITORY/git/refs/heads/$branch"
+          echo "Merged #$PR and deleted $branch" >> "$GITHUB_STEP_SUMMARY"
